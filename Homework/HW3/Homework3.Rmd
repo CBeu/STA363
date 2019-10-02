@@ -1,0 +1,158 @@
+---
+title: "Homework3"
+author: "Craig Beuerlein"
+date: "9/27/2019"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse)
+library(ggfortify)
+library(emmeans)
+library(gridExtra)
+library(knitr)
+```
+
+## R Markdown
+
+## Question 1
+*Import Data*
+```{r peanutStudy}
+peanut <- read.csv("peanutStudy.csv")
+glimpse(peanut)
+```
+
+**EDA**
+```{r}
+ggplot(peanut, aes(x=Solution,y=Yield, color=Oven, group=Oven))  + 
+  stat_summary(fun.y=mean, geom="point") +
+  stat_summary(fun.y=mean, geom="line") + 
+  labs(y="Number of Peanuts Yield", x= "Solution Used") + 
+  theme_bw()
+```
+
+**Proper statistical inference**
+```{r}
+peanut.anova <- aov(Yield ~ Oven + Solution + Oven:Solution, data=peanut)
+autoplot(peanut.anova)
+summary(peanut.anova)
+```
+
+**Checking the underlying assumptions**
+
+*There is normal distrubtion because of the points in the Q-Q plot follow the line. There is constant variance because the points in Residual vs. Fitted are distributted equally. The trials are independent due to the design of the experiment.*
+
+**Any follow-up procedures (use proper method in the context)**
+
+*We do not need any follow up procedures.*
+
+**Conclusions in the context of the problem (You need to report the F statistics along with the two degrees of freedom and the pvalue)**
+
+*The assumptions are correct because the Oven:Soltution p-value of (0.021) is less than 0.05 and the F satistic (3.786) is not close to 1. Due to the p-value, we can state that the type of Oven and type of Solution used are statistically significant.*
+
+
+## Question 2
+**Import Data**
+```{r acidRain}
+acidRain <- read.csv("acidRainStudy.csv")
+```
+
+**Any data processing and data cleaning necessary**
+```{r}
+cleanedAcidRain <- acidRain %>%
+  mutate(Rain.pH = as.factor(Rain.pH),
+         Name = paste(Rain.pH, Depth))
+glimpse(cleanedAcidRain)
+```
+
+**Exploratory data analysis**
+```{r}
+ggplot(cleanedAcidRain)+
+  geom_line(aes(x = TimePeriod, y = Soil.pH, color= Rain.pH, linetype= Depth, group = Name))
+```
+
+*The soil ph has increases at lower depths, with the highest pH at 30-45cm. Regarding rain ph, while the highest point of soil ph is at the lowest rain pH, the rest of the data is too close to make any visual judgements.*
+
+**Proper statistical inference**
+```{r}
+cleanedAcidRain.anova <- aov(Soil.pH ~ TimePeriod + Depth*Rain.pH , data = cleanedAcidRain)
+summary(cleanedAcidRain.anova)
+autoplot(cleanedAcidRain.anova)
+```
+
+*There are np violations of Normality and there is no fanning with the equal variance plot.The interaction between depth and rain ph is not significant. Time Period is signifcant at all confidence intervals (p = 0.000379). Rain pH is not significant (p = 0.110972), but our Depth factor is only a significant at the 90% confidence level(p = 0.075920).*
+
+
+**Any follow-up procedures**
+```{r}
+cleanedAcidRain.mc <- emmeans(cleanedAcidRain.anova, "Depth")
+contrast(cleanedAcidRain.mc, "pairwise")
+plot(contrast(cleanedAcidRain.mc, "pairwise"), level = 0.999)
+```
+
+*The multiple comparisons shows that the only significant Depth difference: 30-45cm yields greater soil ph than 15-30cm.*
+
+
+**Conclusions in the context of the problem  (You need to report the F statistics along with the two degrees of freedom and the pvalue)**
+
+*There is no signifcant impact on soil ph due to rain levels. There is a single significant point: 30-45 cm soil has a higher soil ph when compared to 15-30cm soil.*
+
+## Question 3
+*A state highway department studied the wear characteristics of four different paint formulations at five locations in the state.  The standard, currently used paint (paint 1) and three experimental paints (paints 2, 3, 4) were included in the study.  The five locations were randomly selected, thus reflecting variations in traffic densities throughout the state.  At each location, the four different paints were applied to the chosen road surface in randomly selected places in close proximity.  After a suitable period of exposure to weather and traffic, a combined measure of paint durability and visibility was obtained.*
+
+* **1. What kind of designed experiment is used here? (Choose from: one-way design, one-way with blocks design, two-way design, two-way with blocks design, repeated measures design)**
+
+Two-way with block design
+
+* **2. What is the response variable in the study?**
+
+The five random locations
+
+* **3. List all the different treatments in the study.**
+Paint 1 Location 1
+Paint 1 Location 2
+Paint 1 Location 3
+Paint 1 Location 4
+Paint 1 Location 5
+Paint 2 Location 1
+Paint 2 Location 2
+Paint 2 Location 3
+Paint 2 Location 4
+Paint 2 Location 5
+Paint 3 Location 1
+Paint 3 Location 2
+Paint 3 Location 3
+Paint 3 Location 4
+Paint 3 Location 5
+Paint 4 Location 1
+Paint 4 Location 2
+Paint 4 Location 3
+Paint 4 Location 4
+Paint 4 Location 5
+
+* **4. If doing a multiple comparison procedure on the factor of interest in this study, which technique would be the most appropriate: Bonferroni, Tukey, or Dunnett? Justify in one sentence.**
+
+## Question 4
+*Two experimental pain killer drugs for relief of migraine headaches were studied at a major medical center.  Ten persistent migraine sufferers were randomly selected for a pilot study and received (in random order) each of the four treatment combinations, with a suitable interval between drug administrations.  The decrease in pain intensity was used as the response variable.  The four treatments used in the study were as follows: A1B1 = low dose of both drugs; A1B2 = low dose of drug A, high dose of drug B; A2B1 = high dose of drug A, low dose of drug B; A2B2 = high dose of both drugs.*
+
+* **1. What kind of designed experiment is used here? (Choose from: one-way design, one-way with blocks design, two-way design, two-way with blocks design, repeated measures design)**
+
+One-Way Design
+
+
+* **2. What is/are the factor/factors in this study?**
+
+The two experimental drugs 
+
+* **3. What are the levels of the factor (or factors) you cited in part 2?**
+
+The the two dosage levels of each drug.
+
+* **4. For any factor/factors you cited in part 2, indicate if they are within-subjects factors or between-subjects factors.**
+
+Within subject factors because each migraine sufferer recieved 4 different treaments because of the two drugs and the two lebels.
+
+* **5. What is the purpose of randomizing the order of the treatments here?**
+
+To confirm that a single treaments side-effects did not affect the other treaments a migraine sufferer recieved.

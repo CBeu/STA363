@@ -1,0 +1,230 @@
+---
+title: "STA363 - Class 05"
+author: "Craig Beuerlein"
+date: "Sections A Wednesday, September 11, 2019"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse)
+library(knitr)
+library(ggfortify)
+library(emmeans)
+```
+
+# Blocking
+
+In a statistical setting, a **block** is a relatively homogeneous set of experimental material. 
+
+**What does this mean?**
+
+Essentially a block is a known effect or known **confounding** factor in a design but it is something we are not necessarily experimentally interested in. For example, in a before and after paired $t$-test design, the subject under study (e.g., person or animal) can be considered a block. We know each person/animal has their own dynamics/variability but we are not concerned with those, we are interested testing some other factor.
+
+Many things can be a block, today we will consider one specific example.
+
+## Example 1
+
+A consumer product-testing organization wished to compare the annual power consumption of five different brands of dehumidifier. It is well known that power consumption depends on the prevailing humidity level, so it was decided to monitor each brand at four different (controlled) humidity levels ranging from moderate to heavy humidity. Within each level, five brands were randomly tested and the power consumptions (kWh) was recorded in `humidity.txt` on the Hughes data repository. There, the first column represents the brand (recorded numerically), the second the humidity level (also recorded numerically) and the third column is the annual power consumption.
+
+Describe the following:
+
+* **Experimental Units** in this study?  *The different brands of dehumidifiers*
+
+* The **factor** of interest in this study?  *The different humidity levels*
+
+* How many **factor levels** are there?  *The different levels of humitidy from modereate to severe*
+
+* What are the **treatments**?  *The different brands of dehumidifiers at different humidity levels*
+
+* What **confounding** variable is there? How is it controlled? *The annual power consumption of each dehumidifier*
+
+* What other steps were taken to control for nuisance variables and unexplained variability?  *Brands were randomly selected for each different level of humidity*
+
+```{r}
+# Note: these data are in a .txt file containing a header row: use read.table()
+humidity <- read.table("http://users.miamioh.edu/hughesmr/sta363/humidity.txt", header=TRUE)
+kable(head(humidity))
+```
+
+Notice the brand and humidity levels are recorded as numerical values. We want to make sure R treats them as factor levels.
+
+```{r}
+humidity <- humidity %>%
+  mutate(Brand = as.factor(Brand),
+         Humidity = as.factor(Humidity))
+```
+
+Ultimately we want to statistical test
+
+$$H_0: \mu_1 = \mu_2 = \mu_3 = \mu_4 = \mu_5~~~\textrm{vs.}~~~H_a: \textrm{at least two differ}$$
+where $\mu_i =$ the true mean power consumption for Brand $i$.
+
+### Wrong Analysis
+
+We begin by performing the WRONG analysis for this design. Since we are interested in determinig if Brand influences power consumption, suppose you decided to perform a One-Way ANOVA to test this hypothesis. First we explore some EDA:
+
+```{r}
+humidity %>% 
+  group_by(Brand) %>%
+  summarize(Mean=mean(Power),
+            SD=sd(Power),
+            N=n()) %>%
+  kable()
+ggplot(humidity) + 
+  geom_boxplot(aes(x=Brand, y=Power)) + 
+  theme_bw()
+```
+
+Based on the EDA we do see some difference between the four brands but we also note the high variabilty within each group. This can be seen in the Box-Whiskers plots as there is substantial overlap between the boxes. *(Note that we are summarizing 4 observations with 5 summary statistics! It is silly to use Box-Whiskers plots here).*
+
+We proceed (unwittingly) with a One-Way ANOVA:
+
+```{r}
+wrong.analysis <- aov(Power ~ Brand, data=humidity)
+autoplot(wrong.analysis)
+```
+
+The residual analysis looks pretty good. The variability looks constant and the Normality assumption looks pretty good. 
+
+```{r}
+summary(wrong.analysis)
+```
+
+So looking at the results we see that the Brand does NOT have an influence on power consumption (*p*-value=0.204). Visually we see that maybe Brand 1 is smaller than Brand 5, except ANOVA tells us this is not the case.
+
+**Why is this analysis wrong?**
+
+* *The box-whiskers do not differentiate the different hummidity levels each brand is experiencing and the resulting power usage. *
+* *Boxplots are not useful for small data sets and do not account for counfoudning varaibles(humidity in this instance)*
+
+### Correct Analysis
+
+We begin with some EDA. Rather than a box-whiskers plot we simply plot the observed observations. Since each of the Brands was subjected to four levels of humidity levels we color the points based on Humidity level. We draw some lines connected the Humidity levels -- these are known as *profiles*.
+
+```{r}
+ggplot(humidity) + 
+  geom_line(aes(x=Brand, y=Power, col=Humidity, group=Humidity)) + 
+  geom_point(aes(x=Brand, y=Power, col=Humidity), size=3) +
+  theme_bw()
+```
+
+We see the Power consumption as a function of Brand for each of the Humidity levels. We notice a few things: there appears to be an increase in power consumption from Brand 1 to Brand 5 (note, it does not make sense to call this a trend as the *x*-axis is categorical). We also note that power consumption is highest at humidity level 4.  Visually it appears Brand 5 likely has the most power consumption with Brand 1 the lowest.
+
+We proceed with a One-Way Block ANOVA, we are building the following model:
+
+$$Y_{ij} = \mu + \tau_i + \beta_j + \varepsilon_{ij}$$
+
+where
+
+* $Y_{ij}$ is the power consumption for Brand $i$ in humidity level (block) $j$.
+* $\mu$ is the overall mean
+* $\tau_i$ is the effect of Brand $i$ on the mean response
+* $\beta_j$ is the effect of humidity level $j$ on the mean response
+* $\varepsilon_{ij}$ is the underlying random noise
+
+We can reformulate our hypothesis test as follows
+
+$$H_0: \tau_1 = \tau_2 = \tau_3 = \tau_4 = \tau_5 = 0 ~~~\textrm{versus}~~~ H_a: \textrm{at least one } \tau_i \neq 0$$
+
+**IMPORTANT NOTE!!** In R, when performing a block design, we must list the block term **first** after the `~` in the `aov` statement.
+
+```{r}
+good.analysis <- aov(Power ~ Humidity + Brand, data=humidity)
+```
+
+That's it! We are telling R to model `Power` as a function of `Humidity` and `Brand`. Before performing inference we check the residuals.
+
+```{r}
+autoplot(good.analysis)
+```
+
+Again, everything looks okay with the residual analysis. There is some minor wonkiness in the variability but nothing systematic, so we proceed with formal inference.
+
+```{r}
+summary(good.analysis)
+```
+
+You'll note that R automatically reports a $p$-value for the Humidity factor. This is a known effect, so ignore that result!!! We do not care if it is significant or not, as it is a confounding factor and not of interest to the hypothesis we are testing.
+
+We see that Brand does have an influence on power consumption( $F$-stat of 95.57 on 4 and 12 degrees of freedom, resulting in a $p$-value$\approx 10^{-9}$). 
+
+Since a difference between Brands has been detected, we perform a Tukey multiple comparison to weed out where the differences are:
+
+```{r}
+humidity.mc <- emmeans(good.analysis, "Brand")
+contrast(humidity.mc, "pairwise")
+```
+
+
+```{r}
+plot(contrast(humidity.mc, "pairwise"))
+```
+
+*Across all brands of dehumidifier, the higher the humidity level results in a higher power consumption of the dehumidifier.*
+
+
+
+# Potato Example
+
+The following data set is from a study about the quality of cooked potatoes using various cooking methods. There are several variables in this data set, but for today, we are going to focus on just two of them. We are going to investigate the effect of the cooking method on the flavor score. However, since the potatoes were taken from two different locations, we want to use the location ("GrowArea") as a blocking factor. The cooking methods are as follows:
+1=Boil
+2=Steam
+3=Mash
+4=Bake at 350 degrees F 
+5=Bake at 450 degrees F
+
+Notice we are using a slightly different method to read the data today (called read.table), since our data set is a text file, not a CSV. 
+
+```{r}
+potato <- read.table("potato.txt")
+names(potato) <- c("GrowArea", "Temp", "Size", "StorageTime", "CookingMethod",
+                    "TextureScore", "FlavorScore", "MoistnessScore")
+glimpse(potato)
+```
+
+## Data Cleaning
+
+First, create a reduced data set that only contains the variables we need. You should also make sure factor variables are not being treated as numeric. (For cooking method, set the factor labels to something more meaningful than 1-5).
+
+```{r}
+potato_cleaned <- potato %>%
+  mutate(CookingMethod=factor(CookingMethod, 1:5, labels=c("Boil", "Steam", "Mash", "Bake at 350 degrees" , "Bake at 450 degrees")),FlavorScore = as.factor(FlavorScore))
+glimpse(potato_cleaned)
+```
+
+
+## EDA
+
+Create an interaction plot that shows the average flavor score for each cooking method when adjusting for location. (You should end up with a plot with 2 lines.) Use the potato_means data set to create this plot!
+
+```{r}
+potato_means <- potato %>%
+  group_by(CookingMethod,GrowArea) %>%
+  summarize(FlavorScore=mean(FlavorScore))
+glimpse(potato_means)
+
+interaction.plot(potato_means$CookingMethod, potato_means$GrowArea, potato_means$FlavorScore, ylab = "Flavor Score", xlab = "Cooking Method", trace.label = "Potato Grow Area")
+```
+
+
+## Analysis
+
+Run the one-way block ANOVA to test the effect of cooking method on flavor score blocking for location. Be sure to check your assumptions and explain your results!
+
+```{r}
+potato.anova <- aov(FlavorScore ~ CookingMethod + GrowArea, data=potato_means)
+library(ggfortify)
+autoplot(potato.anova)
+summary(potato.anova)
+```
+
+
+## Multiple Comparisons
+
+Run the tests for multiple comparisons (only if necessary).
+
+**Due to the pp-values of all comparisons being close to 1, the different instructors do not have a significant difference and running a multiple comparison test is not necessary*
+```{r}
+
+```

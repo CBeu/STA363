@@ -1,0 +1,154 @@
+---
+title: "Assignment 04"
+author: "Craig Beuerlein"
+date: "Sections A: Monday, September 9, 2019"
+output: html_document
+---
+
+```{r setup, include=FALSE, warning=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Load Packages
+
+```{r, message=FALSE, warning=FALSE}
+library(knitr)
+library(tidyverse)
+library(ggfortify)
+```
+
+## Data description 
+
+The following data consists of class section-level instructor evaluations in the Marketing department at Miami University over the period 2012-2018. The variables in the dataset are as follows:
+
+* `Term`	-- Academic Year/Term (e.g., 201710=Fall 2016, 201720=Spring 2017)
+* `Instructor`	-- Random instructor ID
+* `Course`	-- Course Type (1=FSB Core, 2=MKT Core, 3=MKT Elective, 4=Marketing Capstone)
+* `Enrolled`	-- Number of student enrolled in class
+* `Completed`	-- Number of students completing course evaluaiton survey
+* `PerCent`	-- Percent of enrolled students completing survey
+
+**The survey question items are as follows.**  Each item was scored by individual students on a 0 to 4 scale (0=Strongly Disagree, 1=Disagree, 2=Neutral, 3=Agree, 4=Strongly Agree).  The entries in the data are class-level mean ratings:
+
+* `iStandards` -- *"The instructor held students to high academic standards."*  
+* `iChallenged`	-- *"The instructor effectively challenged me to think and learn."*  
+* `iPrepared`	-- *"The instructor was well prepared."*  
+* `iConcepts`	-- *"Examinations and/or other graded components covered course concepts in a challenging manner."*  
+* `iEnthusiasm`	-- *"The instructor showed enthusiasm for the subject."*  
+* `iAskQues`	-- *"I felt free to ask questions and to make comments in class."*  
+* `iQuesEffect`	-- *"The instructor dealt with questions and comments effectively."*  
+* `iHours`	-- *"The instructor was generally available during office hours."*  
+* `iRating`	-- *"What is your overall rating of the instructor?"*  
+* `iWelcQues`	-- *"My instructor welcomed students' questions."*  
+* `iParticipate` -- *"My instructor offered opportunities for active participation to understand course content."*  
+* `iDemo`	-- *"My instructor demonstrated concern for student learning."*  
+* `iAnalyProb`	-- *"In this course I learned to analyze complex problems or think about complex issues."*  
+* `iTopicApp`	-- *"My appreciation for this topic has increased as a result of this course."*  
+* `iUnderstand`	-- *"I have gained an understanding of this material."*  
+
+-----
+
+## Read in the data
+
+We also "fix" the factor variables just like last week:
+
+```{r read_data}
+evals <- read.csv("http://users.miamioh.edu/hughesmr/sta363/teachingEvals.csv")
+evals <- evals %>% 
+  mutate(Instructor = as.factor(Instructor),
+         Course = factor(Course, 1:4, labels=c("FSB Core", "MKT Core", "MKT Elective", "MKT Capstone")))
+```
+
+## Some filtering
+
+```{r filter_data}
+hidden1 <- evals %>%
+  filter(Course=="FSB Core") %>% 
+  group_by(Instructor) %>% 
+  summarize(N=n()) %>% 
+  filter(N>16) %>% 
+  ungroup()
+hidden2 <- evals %>%
+  filter(Instructor %in% hidden1$Instructor,
+         Course == "FSB Core")
+```
+
+## Question 1
+
+**What is in the dataset `hidden2`?**  That is, it is comprised of what subset of the original evaluation data from the marketing department? You are to use this dataset for all questions below.
+
+* hidden2 contains all the items that hidden1 summarized
+
+
+## Question 2
+
+Discuss if this data is part of a **designed experiment** or an **observational study**.  How do you know?
+
+* This data is part of an obersvational study because the data collected was measured without any treatment or intervention from those who were collecting the data. The experiences that each subject recieved was beyond the control of the data collectors. 
+
+
+## Question 3
+
+**Generate a table** of meaningful summary statistics by `Instructor`.  Comment on the result.
+
+```{r}
+hidden2 %>% 
+  group_by(Instructor) %>% 
+  summarize(Mean=mean(iUnderstand), 
+            SD=sd(iUnderstand),
+            Var=var(iUnderstand), 
+            N=n() ) %>% 
+  kable()
+```
+
+* The mean scores for `Instructors` for `iUnderstand` are very close to each other with only a ~0.18 mean score difference between the max mean and the smallest mean.
+
+
+## Question 4
+**Plot the distributions of the mean response** to the evaluation question `iUnderstand` by `Instructor`.  **Comment** on what you see, including comment on average and variation in evaluation scores.
+
+```{r}
+ggplot(hidden2) + 
+  geom_boxplot(aes(x=Instructor, y=iUnderstand)) +
+  labs(x="Instructor", y="iUnderstand Score") + 
+  theme_bw()
+```
+
+* The box plots' range and size are very similar to one another further confirming the closeness of the mean the `Instructors` have. 
+
+
+## Question 5
+
+**Run a one-way ANOVA** to test to see if there is any difference in true mean evaluation scores for `iUnderstand` between the `Instructors`.  **You must cite** the F-statistic value, both numerator and denominator degrees of freedom, the p-value, and the conclusion in problem context.
+
+```{r}
+q5 <- aov(iUnderstand ~ Instructor, data=hidden2)
+summary(q5)
+```
+
+* Here we see an *F* = 1.889 on 3 and 120 degrees of freedom, which is close to the value of 1 dues to the *p-value* = 0.136. So we have evidence to suggest the different `Instructor` do not have an impact on the `iUnderstand` score reported. This *p-value* is only valid since the underlying assumptions of ANOVA are met.  
+
+
+## Question 6
+
+Check the model residuals to see if there are any suspected problems among the model assumptions.
+
+```{r}
+autoplot(q5)
+```
+
+* There are no concerns with the current plots of data. The "Normal Q-Q" plot reasonably follow the 45-degree line. The "Residuals vs Fitted" plot and the "Scale Location" plot have blue lines that are fairly horizontal and there does not appear to be any systematic patterns in the plotted points.
+
+
+## Question 7
+
+Perform Tukey-adjusted multiple comparisons (only if necessary!) and report the results in context.
+
+```{r}
+library(emmeans)
+q7 <-emmeans(q5, "Instructor")
+contrast(q7, "pairwise")
+```
+
+* Due to the pp-values of all comparisons being close to 1, the different instructors do not have a significant difference.
+

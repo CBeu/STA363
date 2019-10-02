@@ -1,0 +1,187 @@
+---
+title: "Assignment 10"
+author: "Craig Beuerlein"
+date: "Sections A Wednesday, October 2, 2019"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse)
+library(knitr)
+library(GGally)
+library(lindia)
+library(ggfortify)
+```
+
+
+
+# Multiple Regression Example: Crime rates
+
+State-level crime rate data is provided for all US states and the District of Columbia for the year 2008.  All crime rates are epressed as number of crimes per 100,000 residents.  We are interested in variables that are related to the burglary rate.  The data appear in the CSV file `stateCrimeData.csv`. The variables in the data set are:
+
+* `Pop` - Population by state (2008)
+
+Crime variables:
+
+* `Murder` - Murder and non-negligent manslaughter rate (2008)
+* `Rape` - Forcible Rape rate (2008)
+* `Robbery` - Robbery rate (2008)
+* `Assault` - Aggravated Assault rate (2008)
+* `Burglary` - Burglary rate (2008)
+* `VehTheft` - Vehicle Theft rate (2008)
+
+Demographic Variables:
+
+* `UnEmp` - Unemployment Rate (2010)
+* `HSGrad` - Percentage of adult population that graduated from high school (2005)
+* `CollGrad` - Percentage of adult population that graduated from college (2005)
+* `MedianInc` - Median Income for Family of 4 (2005)
+
+Crime Related Expenitures: 
+
+* `Police` - Police Expenditures (2005)
+* `Judicial` - Judicial Expenditures (2005)
+* `Corrections` - Corrections Expenditures (2005)
+
+Consider the following code:
+
+```{r}
+states <- read.csv("stateCrimeData.csv")
+
+crimedata <- states %>%
+  filter(state != "District of Columbia") %>%
+  select(Pop, HSGrad, CollGrad, UnEmp, MedianInc, Burglary)
+```
+
+### Why remove Washington, DC?
+
+The code `state != "District of Columbia"` filters out (removes) the measurement for Washington, DC. The answer as to why we might want to do this goes back to the first week of your introductory statistics course.
+
+The data is provided at the state level: for one, Washington, DC is not a state. More importantly, Washington, DC is a city comprised of entirely an urban environment. Compare this to any of the remaining 50 states which are comprised of urban, suburban and rural type environments. Washington, DC essentially comes from a different population than the other observations!
+
+### Relationship between variables
+
+Before looking at the scatterplot matrix, note that the response variable we are studying, `Burglary` is listed last. This is not necessary but does make the scatterplot easier to read since the response variable will be on the $y$-axis.
+
+```{r}
+ggscatmat(crimedata)
+```
+
+Some things to note:
+
+* The correlation between Burglary and population is not as strong as we might expect (0.17).
+* There is a fairly strong negative correlation between high school graduation rate and burglary (more high school graduates, the lower the burglary rate).
+* Likewise, both College graduation rate and median income have a moderate negative correlation with burglary, and unemployment has a moderate positive correlation (more unemployment correlated with a higher burglary rate).
+* Also note that several of the predictor variables are correlated among themselves (e.g., median income and college graduation rate are fairly strongly correlated).
+
+### Fit a full "main effects" model
+
+Considering fitting the full model and checking the underlying assumptions:
+
+```{r}
+crimefit1 <- lm(Burglary ~ Pop + HSGrad + CollGrad + UnEmp + MedianInc, data=crimedata)
+autoplot(crimefit1)
+```
+
+Visually, we see that the residuals are fairly normal and the linearity (can be determined from the Residuals vs Fitted plot blue line) seems reasonable. We note from the Residuals vs Fitted plot (or the Scale-Location plot) that there may be an issue with an increasing variance. So, we *consider* a Box-Cox transformation:
+
+```{r}
+gg_boxcox(crimefit1)
+```
+
+Note the peak of the curve is close to $\lambda=0.3$. However, also note that the plot provides a *range* of $\lambda$ values, and this includes values as low as -0.3 and as large as 1. This essentially is telling us a Box-Cox transformation between -0.3 and 1 is reasonable.  If $\lambda=1$ you are *transforming* your response variable $Y$ with $Y^1$. That is, you are not transforming. 
+
+On last lecture we saw that when you transform variables, it may *fix* certain diagnostic issues, but it comes with a cost -- interpretability. To maintain interpretability, we choose to do no transformation. 
+
+## Does the model provide any insight?
+
+In statistics, we are trying to study and explain variability. In this particular example, we are exploring burglary rates across all 50 states in the United States. A simple question we can answer: **Do Population, High School Graduation Rate, College Graduation Rate, Unemployment and Median Income help predict Burglary rates?**
+
+Before answering the question, let's look at the equation of the model we just fit:
+
+$$Burglary = \beta_0 + \beta_1(Population) + \beta_2(HSGrad) + \beta_3(CollGrad) + \beta_4(UnEmp) + \beta_5(MedianInc) + \varepsilon$$
+
+Let's suppose for a moment that the predictor variables (Population, High School Graduation Rate, College Graduation Rate, Unemployment and Median Income) provide **no** insight into Burglary rates. From the model's perspective, this would imply that $\beta_1 = \beta_2 = \beta_3 = \beta_4 = \beta_5 = 0$. So, we wish to statistically test:
+
+$$H_0: \beta_1 = \beta_2 = \beta_3 = \beta_4 = \beta_5 = 0 ~~~\textrm{vs}~~~H_a: \textrm{at least one } \beta_i \neq 0$$
+
+We can rewrite this same set of hyotheses in another framework. If $\beta_1 = \beta_2 = \beta_3 = \beta_4 = \beta_5 = 0$, then the model above can be simplified to
+
+$$Burglary = \beta_0 + \varepsilon = \mu + \varepsilon$$
+
+This simplified model is known as the **null model**. Thus, the hypothesis test above can be rewritten more generally as
+
+$$H_0: null~model ~~~\\H_a: more~complex~model$$ 
+or in our specific case here,
+
+$$H_0: \beta_0 + \varepsilon ~~~\\
+H_a: \beta_0 + \beta_1(Population) + \beta_2(HSGrad) + \beta_3(CollGrad) + \beta_4(UnEmp) + \beta_5(MedianInc) + \varepsilon$$
+
+All of these hypothesis test are equivalent. You should note they are analogous to the sort of test we conducted in experimental design -- ANOVA. As it turns out, **we actually use an ANOVA $F$-test for this hypothesis** (derivation is left to STA 463) and is provided in the `summary` output.
+
+```{r}
+summary(crimefit1)
+```
+
+With an $F$-stat of 9.29 on 5 and 44 degrees of freedom ($p$-value$\approx 10^{-6}$), we have significant evidence that at least one $\beta_i \neq 0$, or in context, **some combination of Population, High School Graduation Rate, College Graduation Rate, Unemployment and Median Income is related to Burglary rate.**
+
+## Do **specific** variables influence the response?
+
+When covering experimental design, if the overall ANOVA test found a difference amongst treatments, we followed up that test with multiple comparisons. Likewise, we can do the same with regression by considering a $t$-test (or $t$-based confidence interval) for each of the $\beta_i$ parameters. The test statistic for any predictor variable is given by $t_0 = \frac{b_i}{SE_{b_i}}$ and the specific values are provided in the `summary` output. Interpreting these tests is somewhat tricky because they are all **conditional tests** based on the other predictors in the model. For example, if we wished to test if Population is an important predictor, then we are testing
+
+$$H_0: \beta_{Population} = 0 ~~~\textrm{vs}~~~ H_a: \beta_{Population} \neq 0$$
+when conditioning that the other variables are in the model. So we find with $t=-0.709$ and $p$-value=0.482. Population is not a significant predictor for Burglary **given HSGrad, CollGrad, UnEmp and MedianInc are in the model.** 
+
+Likewise, we can test other parameters:
+
+* `HSGrad` is a siginificant predictor, given Population, CollGrad, UnEmp and MedianInc are in the model.
+* `CollGrad` is *not* a significant predictor, when Population, HSGrad, UnEmp and MedianInc are in the model.
+* `UnEmp` is a significant predictor given Population, HSGrad and CollGrad and MedianInc are in the model.
+* `MedianInc` is a significant predictor given Population, GSGrad, CollGrad and UnEmp are in the model.
+
+**THOUGHT EXERCISE.** It appears College Graduate Rate is not a significant predictor of Burglary, yet their correlation in the EDA was -0.44. Any ideas as to why this happened?
+
+*ANSWER HERE*
+
+
+We can also do the above with confidence intervals, if we chose.  These are actually preferred in practice because they help provide a **size** to the impact of a predictor, in addition to just determining if it has a statistically significant effect:
+
+```{r}
+confint(crimefit1, level=0.99)
+```
+
+Below is a generic interpretation:
+
+* With 99\% confidence, when all other variables are held constant, a one-unit increase in `HSGrad` will lower `Burglary` between 2.8 and 52.7 units.
+
+**EXERCISE**. Rewrite this interpretation in fully contextual terms.  By that, we mean to state the finding in clearly understood jargon, providing the units of all variables involved.
+
+*ANSWER HERE*
+
+## How much does the model provide?
+
+Using the overall ANOVA $F$-test we see that a combination of Population, High School Graduation Rate, College Graduation Rate, Unemployment and Median Income predicts Burglary rates. Using the individual $t$-test we gain insight into which of those variables predicts Burglary. A natural follow-up question one may ask is: **How much** insight does it provide? 
+
+To answer that question, we want to revisit the underlying question we consider in statistics, **explaining variability**. If the model explains the variability in Burglary well, we would expect the *Residual Standard Error* to be small. Of course, the term *small* is relative (e.g. variability in GPA amongst students is quite different than variability in incomes). A common approach in statistics for this sort of measure is the *coefficient of determination*, or R-squared ($R^2$). Essentially, it compares the difference in explained variance in the response as calculated in the *complex model* above to that in the *null model* above. (Or to frame it another way, the variance of the response variable `Burglary` to the variance of the residuals after we fit the model.)
+
+It can be shown that $R^2$ is **not** a good measure on its own since it will always sway a practitioner into choosing a more complicated model. In practice, it is recommended that we use the **Adjusted R-squared** value ($R^2_a$) which adds a penalty term for each predictor variable. This is also included in the `summary` output via `Adjusted R-sqared`. 
+
+We see that the linear model of Population, High School Graduation Rate, College Graduation Rate, Unemployment and Median Income explains approximately 45\% of the variability in Burglary rates.
+
+# Transformed Response model
+
+In the above description, we fit a model to the original (untransformed) response, but when looking at the Box-Cox plot there was some indication that a transformation may be necessary. Construct a model where you fit the square root of the Buglary rate as a function of the Population, High School Graduation Rate, College Graduation Rate, Unemployment and Median Income. Answer the following about this model.
+
+1. Does this model satisfy the underlying assumptions on multiple linear regression? Discuss.
+2. Does the model collectively predict the square root of the Buglary rate? Reference specific output.
+3. Do any predictor variables appear to influence the square root of the Burglary rate? Reference specific output.
+4. How much of the variability in the square root of the Burglary rates is explained by the model? Reference specific output.
+5. Which model do you prefer, the new model based on the square root of the burglary rate, or the original we fit above? Why?
+
+*DO ANALYSIS AND WRITE ANSWERS HERE*
+
+
+
+
+

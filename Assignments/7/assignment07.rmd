@@ -1,0 +1,78 @@
+---
+title: "Assignment 07"
+author: "Craig Beuerlein"
+date: "Sections A Monday, September 23, 2019"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse)
+library(knitr)
+library(emmeans)
+```
+
+# Study
+
+A study was conducted to determine the effects of alcohol on human reaction times. Fifty-seven adult individuals within two age groups were recruited for this study and were randomly allocated into one of three alcohol treatment groups -- a **control** where the subjects remain sober during the entire study, a **moderate** group were the subject is supplied alcohol but is limited in such a way that their blood alcohol content (BAC) remains under the legal limit to drive (BAC of 0.08) and a group that received a **high** amount of alcohol to which their BAC may exceed the legal limit for driving. Each subject was trained on a video game system and their reaction time (in milliseconds) to a visual stimulus was recorded at 7 time points 30 minutes apart (labeled T0=0, T1=30, T2=60 and so on). At time point T0, all subjects were sober and those in one of the alcohol consumption groups began drinking after the first measured reaction time (controlled within the specifications outlined). The researcher is interested in determining the influence alcohol and age (namely, is reaction time different for those in the 20s versus 30s) has on reaction times.
+
+The task for today is to do a complete analysis for this study and dig into the effects of alcohol, age and time have on reaction times.
+
+----------------
+
+# Data input and wrangling
+```{r}
+alcohol <-read.csv("alcoholReaction.csv")
+head(alcohol)
+
+alcohol <- alcohol %>%
+  mutate(Age=case_when(Age<31 ~ "20s", 
+                       Age %in% 31:40 ~ "30s"))
+head(alcohol)
+
+alcohol.tall <- alcohol %>%
+  gather (key=Time, value=Reaction, c(T0, T1, T2, T3, T4, T5, T6))
+head(alcohol.tall)
+
+alcohol.tall <- alcohol.tall %>%
+  mutate(Subject=as.factor(Subject), 
+         Alcohol=factor(Alcohol, levels=c("Control", "Moderate", "High")))
+```
+
+
+# Exploratory Data Analysis
+```{r}
+ggplot(alcohol.tall, aes(x=Time,y=Reaction, color=Alcohol, group=Subject))  + 
+  stat_summary(fun.y=mean, geom="point") +
+  stat_summary(fun.y=mean, geom="line") + 
+  labs(y="Reaction Level", x="Time Passed") + 
+  theme_bw()+
+  facet_wrap(~Age)
+
+```
+
+
+# Model fitting and analysis
+```{r}
+alcohol.anova <- aov(Reaction ~ Time*Alcohol*Age + Error(Subject/Time), data=alcohol.tall)
+summary(alcohol.anova)
+```
+**Since the F-Statsitc for Time:Alcohol:Age (0.950) is close to one and the P-Value (0.49702) is far greater than 0.05, the data is not significant. Time and Alcohol is the only data that is significant with a P-Value (0.00125) less than 0.05 and a F-Statistic (2.790) much larger than 1.**
+
+
+# Multiple Comparison Follow ups
+```{r}
+alcohol.mc <- emmeans(alcohol.anova, "Alcohol","Time")
+contrast(alcohol.mc, "trt.vs.ctrl", ref=1)
+confint(contrast(alcohol.mc, "trt.vs.ctrl", ref=1))
+plot(contrast(alcohol.mc, "trt.vs.ctrl", ref=1))
+```
+
+
+Note: We have two levels of *control* in this study, there is an explicit **Control** group and at time point T0 no subjects had been given a treatment, so it also operates as a control. Dunnett's method for multiple comparison is most appropriate (see chapter 2.7 of the text).
+
+**The overlap of High-Control and Moderate-Control is significant in all sets of Reaction data.**
+
+# Conclusions
+**The reaction times of a drinker do not coorelate to drinking amount or age of the drinker.**
+

@@ -1,0 +1,206 @@
+---
+title: "Assignment 09"
+author: "Craig Beuerlein"
+date: "Sections A Monday, September 30, 2019"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse)
+library(knitr)
+library(GGally)
+library(lindia)
+library(ggfortify)
+```
+
+### Example: Supervisors data
+
+In a study of 27 industrial establishments of varying size, the number of supervised workers and the number of supervisors were recorded.  The goal of the study was to address supervisor needs in industries similar to those sampled, and to develop a model to relate (and ultimately, predict) supervisor needs for a given sized workforce.  The data appear in the text file `supervisors.txt`.
+
+Read in the data and take a quick look:
+
+```{r}
+supdata <- read.table("supervisors.txt", header=TRUE)
+kable(head(supdata))
+```
+
+Which variable plays which role?
+
+* The **predictor variable** ($X$) in this scenario is:  *Number of Employees*
+* The **response variable** ($Y$) in this scenario is : *Number of Supervisors*
+
+Since there is only one predictor variable, we start with a simple scatterplot of the data to visually investigate the nature of the relationship:
+
+```{r}
+ggplot(supdata, aes(x=n.workers, y=n.supervisors)) +
+  geom_point() + 
+  xlab("Number of Workers") +
+  ylab("Number of Supervisors")
+```
+
+**Question:** Based on the above, does it appear as though a simple linear regression model $Y = \beta_0 + \beta_1 X_1 + \varepsilon$ will be adequate to explain the relationship between the size of the supervisor force and size of the work force?  
+
+*The above model is not reasonable. The more workers there are in a particular industry, the more supervisors are necessary. However, as you get into larger and larger workforces, the number of supervisors needed shallows out. Therefore we can not say that for every additional worker we need "x" number of supervisors.*
+
+--------------
+
+#### Assumptions for linear regression
+
+The assumptions are important for when we use the model for inference and prediction later, so we need to check them up front.  The assumptions are much the same as for the ANOVA models that we had before, but with one importaant addition:
+
+1. **Independence**: The $\varepsilon$ terms are independent (i.e. the residuals are independent).
+2. **Homogeneous error variance**: The variance of the $\varepsilon$ terms are constant regardless of the values of the predictor variables.
+3. **Normality**: The $\varepsilon$ terms are Normally distributed.
+
+...and one important new one:
+
+4. **Linearity**: The form of the model being fit is appropriately specified.
+
+The last assumption is new because we have choices in model specification now, so we need to choose judiciously.  We can add a **smoother** to get a better sense of the trend suggested by the data themselves:
+
+```{r}
+ggplot(supdata, aes(x=n.workers, y=n.supervisors)) +
+  geom_point() + 
+  geom_smooth() +                 # adds a smoother
+  xlab("Number of Workers") +
+  ylab("Number of Supervisors")
+```
+
+*WHAT DO WE SEE?*
+
+****
+
+The linearity assumption can be formally checked by looking at the *Residuals vs Fitted values* plot, and seeing if there is any systematic trend remaining in the residuals.  **If the model has been reasonably well specified, there should be no "trending" left in the residuals** (which by definition, are the "leftovers" after fitting the model!).
+
+Let's check the linear regression model fit to the observed data values, and check the assumptions:
+
+```{r}
+fit1 <- lm(n.supervisors ~ n.workers, data=supdata)
+autoplot(fit1)
+```
+
+We see evidence of non-linearity...see how the Residuals vs Fited plot shows clear curvature.  So it appears that $X$ does not relate linearly to $Y$ here!  So a straight-line model is probably not a good choice.  
+
+The residuals also exhibit non-homogeneous variance (violation of Assumption 2).  This can often be addressed by trying a **Box-Cox power transformation** on the $Y$ variable.  **See textbook section 8.2**. Box-Cox looks at the data and determines a power $\lambda$ to raise the response variable $Y$ to in order to "tame" the problem.  Box-Cox is available in the `lindia` library, using the function `gg_boxcox`:
+
+```{r}
+library(lindia)
+gg_boxcox(fit1)      # use fit1 from above
+```
+
+A $\lambda$ value of around 0.5 is suggested.  This is the square root transformation, so we decide to instead use $\sqrt{Y}$ (i.e. $\sqrt{n.supervisors}$) as the response variable.  So now, fit this transformed model and recheck the residuals:
+
+```{r}
+fit2 <- lm(sqrt(n.supervisors) ~ n.workers, data=supdata)
+autoplot(fit2)
+```
+
+The fanning in the residuals has been greatly reduced (the normality is also much better ... these often go hand-in-hand). 
+
+**But the drastic non-linearity still exists.**  So what can we do?  We try transforming the $X$ variable to address non-linearity.  Looking at the original scatterplot and remembering a little bit about algebraic functions can be useful here.  A square root transformation on $X$ might be a good choice to start with:
+
+```{r}
+fit3 <- lm(sqrt(n.supervisors) ~ sqrt(n.workers), data=supdata)
+autoplot(fit3)
+```
+
+This appears to be better .. still not "textbook" great, but we have addressed a big part of the assumption problems through transformation. So, we  settle on the model form
+
+$$\sqrt{n.supervisors} = \beta_0 + \beta_1 \sqrt{n.workers} + \varepsilon$$
+
+Once satisfied with the model form, we then look at the coefficient estimates and residual standard error:
+
+```{r}
+summary(fit3)    # model fit summary
+```
+
+*INTERPRETATIONS?* Not so easy with transformed variables!
+
+* The **residual standard error** (see textbook section 5.2) here is $s$ = 0.9578. Note that **this is in the units of this model's form of the response variable**, which is now square root units. This makes interpretation difficult (in the untransformed model, you can see that the residual standard error is 21.73.), especially since the predictor variable is also transformed here. 
+* The $\beta$-coefficient estimate for the predictor here is $b_{1} = 0.31074$.  So for each additional square root unit of `n.workers`, we expect that the square root of `n.supervisors` will increase by 0.3107.  (Not too intutive, is it?)
+
+Transformations can help us satisfy assumptions underlying an inference, but they can present challenges of their own as side effects we have to deal with.
+
+--------------
+
+## ACTIVITY 
+
+### Multiple Regression Example: Crime rates
+
+State-level crime rate data is provided for all US states and the District of Columbia for the year 2008.  All crime rates are expressed as number of crimes per 100,000 residents.  We are interested in variables that are related to the burglary rate.  The data appear in the CSV file `stateCrimeData.csv`. The variables in the data set are:
+
+* `Pop` - Population by state (2008)
+
+Crime variables:
+
+* `Murder` - Murder and non-negligent manslaughter rate (2008)
+* `Rape` - Forcible Rape rate (2008)
+* `Robbery` - Robbery rate (2008)
+* `Assault` - Aggravated Assault rate (2008)
+* `Burglary` - Burglary rate (2008)
+* `VehTheft` - Vehicle Theft rate (2008)
+
+Demographic Variables:
+
+* `UnEmp` - Unemployment Rate (2010)
+* `HSGrad` - Percentage of adult population that graduated from high school (2005)
+* `CollGrad` - Percentage of adult population that graduated from college (2005)
+* `MedianInc` - Median Income for Family of 4 (2005)
+
+Crime Related Expenitures: 
+
+* `Police` - Police Expenditures (2005)
+* `Judicial` - Judicial Expenditures (2005)
+* `Corrections` - Corrections Expenditures (2005)
+
+```{r}
+states <- read.csv("stateCrimeData.csv")
+
+crimedata <- states %>%
+  filter(state != "District of Columbia") %>%
+  select(Pop, HSGrad, CollGrad, UnEmp, MedianInc, Burglary)
+```
+
+#### QUESTIONS
+
+1. In the code above, which variables and states are being retained for analysis?
+
+*All of the demographic values and the Bulgulary rate from all states but not Washington DC.*
+
+2. Build and interpret a scatterplot matrix of the burglary rate, population and all demographic variables.
+
+```{r}
+ggscatmat(crimedata)
+```
+
+3. Fit a multiple linear regression model using population and all the demographic variables as predictors.
+
+```{r}
+mr.model1 <- lm(Burglary ~ HSGrad + CollGrad + UnEmp + MedianInc + Pop, data=crimedata)
+summary(mr.model1)
+autoplot(mr.model1)
+```
+
+*Only the Intercept, HSGrad, UnEmp, and MedianInc are significant with p-values less than 0.05*
+
+4. How do the regression assumptions look for the model in question 3?  Does it appear necessary to apply a power transformation to the response variable?  Check using Box-Cox.
+
+```{r}
+library(lindia)
+gg_boxcox(mr.model1)
+```
+
+*The residual standard error is 185.8 and the Multiple R-Squared is 0.5136 so ~51% of response variance can be attributed to the model.*
+*A $\lambda$ value of around 0.3 is suggested.*
+
+5. Interpret the value of the $\beta$-coefficient estimate for the predictor `MedianInc` in your model from question 3.  Write your interpretation completely in problem context. 
+
+*The $/beta$-coefficient in regards to MedianInc is -9.017e-03. When all other predictors are held fixed, the predicted mean MedianInc will decrease by 9.017e-03 dollars for each additional person added to the population.*
+
+
+6. Fit different combinations of population and demographic predictors to try to find a "preferred" model for predicting burglary rate.  Use the residual standard error as your criterion.
+```{r}
+mr.model1 <- lm(Burglary ~ UnEmp + MedianInc + Pop, data=crimedata)
+summary(mr.model1)
+```

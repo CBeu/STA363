@@ -1,0 +1,88 @@
+---
+title: "Homework #2"
+author: "Craig Beuerlein"
+date: "September 16, 2019"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse)
+library(ggfortify)
+library(emmeans)
+library(gridExtra)
+library(knitr)
+```
+
+## Import Dataset
+*R Code to import the dataset "espresso1.csv" from a local directory on the computer*
+```{r espresso}
+espresso <- read.csv("espresso1.csv")
+glimpse(espresso)
+```
+
+## Question 1
+**In words, describe a procedure for how the experimenter should have determined which to use on any particular group of coffee beans.**
+
+*An experimenter should have used a randomization procedure to assign experimental units to treatments (such as a CDR in R), which would make the effects of lurking variables distributed across all conditions in the experiment.*
+
+## Question 2
+**Generate a table of meaningful summary statistics by brewing method.  Comment on the result.**
+
+*R Code to generate meaningful summary statistics by brewing method*
+```{r}
+espresso %>% 
+  group_by(method) %>%
+  summarize(Mean=mean(foamIndx),
+            SD=sd(foamIndx),
+            Median=median(foamIndx),
+            Min=min(foamIndx),
+            N=n()) %>%
+  kable()
+```
+
+**The data summary shows that the Bar Machine Method and the Espresso System method have similar mean values, median values, and standard deviation values. However, the Hyper-Espresso Method are significantly larger compared to the other values in the data set.**
+
+## Question 3
+**Plot the distributions of foam index by brewing method.  Comment on what you see, including comment on average and variation in foam index**
+
+*R Code to plot the distributions of foam index by the brewing method*
+```{r}
+ggplot(espresso) + geom_boxplot(aes(x=method, y=foamIndx))
+```
+
+**The Box Plot produced above show that the Bar Machine Method and the Espresso System method have similar averages, but the Hyper-Espresso Method has the highest foam index value and variation. The Espresso System has two outliers that are higher than the rest of the values in the dataset.**
+
+## Question 4
+**Check the model assumptions for the ANOVA testing if there is any difference in true mean foam index between the three brewing methods.**
+
+*R Code to conduct an ANOVA test*
+```{r}
+espresso.anova <- aov(foamIndx ~ method, data=espresso)
+library(ggfortify)
+autoplot(espresso.anova)
+```
+
+**There are no concerns with the plots of data. The Residuals vs. Fitted and Scale-Location plots are fairly horizontal and there is not any systematic patterns in the plotted points in regards to Constant Variance. The points in the Normal Q-Q plot follow a 45-degree line in regards to Normality. All test were independent because the different methods were randomized.**
+
+## Question 5
+**Provide the ANOVA output. Report your F-statistic value, both numerator and denominator degrees of freedom, the p-value, and the conclusion in problem context.**
+
+*R Code to generate output from the previous ANOVA test*
+```{r}
+summary(espresso.anova)
+```
+
+**The F-Value is reported as 28.41 on degrees of freedom 2 and 24. This is significantly higher than the value of 1 because the p-value is reported as 4.7e-07. Therefore there is evidence to suggest the different brewing methods influence the foam index. However, the p-value is only accurate because we have assumed that the underlying assumptions of the ANOVA were met.**
+
+## Qeustion 6
+**Perform Tukey-adjusted multiple comparisons (only if necessary!) and report the results in context.**
+
+*R Code to perform a Tukey-adjusted multiple comparison test*
+```{r}
+espresso.mc <- emmeans(espresso.anova, "method")
+contrast(espresso.mc, "pairwise")
+plot(contrast(espresso.mc, "pairwise"))
+```
+
+**According to the estimated values reported, the Hyper-Espresso Method produces significantly more foam than any other method. We know this because in comparisons with the Hyper-Espresso Method, a larger number is produced (-28.9 & 21.6).**

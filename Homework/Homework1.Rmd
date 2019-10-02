@@ -1,0 +1,34 @@
+---
+title: "Homework1"
+author: "Craig Beuerlein"
+date: "8/30/2019"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Load Packages
+
+This code chunk will load all the packages that will be used for this course.
+
+```{r}
+library(tidyverse)
+library(knitr)
+library(GGally)
+library(ggfortify)
+library(gridExtra)
+library(emmeans)
+library(lindia)
+library(car)
+library(leaps)
+```
+## System and Session Information
+
+This code chunk will display information about this current session of R Studio.
+
+```{r}
+Sys.info()
+sessionInfo()
+```

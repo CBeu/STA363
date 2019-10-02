@@ -1,0 +1,133 @@
+---
+title: "Assignment 02"
+author: "Craig Beuerlein"
+date: "Sections A,C: Wednesday, August 28, 2019 <br> Section B: Thursday, August 29, 2019"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+Now you get the opportunity to perform a similar analysis as the example we covered in class today. Below is out an outline of your expectations. The primary task for today is to take the supplied code in the example and modify it for the specific problems we outline below. Some code is provided and space is included for all the *code chunks* needed to do the assignment.
+
+## Load the packages
+
+First we load the necessary packages (nothing for you to do here!)
+
+```{r, message=FALSE}
+library(tidyverse)
+library(knitr)
+```
+
+
+## Part 1 - Data Input
+
+In the below code chunk, provide code to properly input the data and modify any variables so they are processed correctly (i.e., numeric to factor)
+
+```{r get data}
+evals <- read.csv("http://users.miamioh.edu/hughesmr/sta363/teachingEvals.csv")
+evals <- evals %>%
+  mutate(Term = as.factor(Term),
+  Instructor=as.factor(Instructor),
+  Course=factor(Course, 1:4, labels=c("FSB Core", "MKT Core", "MKT Elective", "MKT Capstone")))  
+glimpse(evals)
+```
+
+
+## Part 2
+
+We will eventually perform a two-sample $t$-test to compare the Appreciation of the Topic (`iTopicApp`) rating for Instructors coded 6291 and 6919. In the next chunk author some code to filter down to the relevant and necessary data.
+
+```{r}
+evals2017 <- evals %>%
+  filter(Instructor %in% c(6291, 6919)) %>%
+  select(Instructor, iTopicApp)
+glimpse(evals2017)
+```
+
+## Part 3
+
+Compute the mean, standard deviation and 5-number summary for the Appreciation of Topic rating for the two instructors under study.
+
+```{r}
+evals2017 %>%
+  group_by(Instructor) %>%
+  summarize(Mean=mean(iTopicApp),
+            SD = sd(iTopicApp),
+            Min=min(iTopicApp),
+            Q1 = quantile(iTopicApp, prob=0.25),
+            Median=median(iTopicApp),
+            Q3 = quantile(iTopicApp, prob=0.75),
+            Max=max(iTopicApp)) %>%
+    kable()
+```
+
+## Part 4
+
+In the next code chunk construct a graphic to compare the teaching evaluations for Instructors 6291 and 6919 based on the Appreciation of the Topic metric.
+
+```{r}
+ggplot(evals2017, aes(x=Instructor, y=iTopicApp)) + 
+  geom_boxplot() + 
+  stat_summary(fun.y=mean, geom="point", shape=23, size=3, fill="gray60") + 
+  theme_minimal()
+```
+
+What are your findings based on the graphic from Part 4 and the numeric summary in Part 3?
+
+**The mean score of Instructor 6919 is higher than Instructor 6291 however 6919 has a larger range of scores.**
+
+## Part 5
+
+Perform the appropriate $t$-test (equal or unequal variance assumption) comparing the teaching evaluations for the two instructors.
+
+$$H_0: \mu_{Instructor6291} = \mu_{Instructor6919} ~~ \textrm{versus} ~~ H_a: \mu_{Instructor6291} \neq \mu_{Instructor6919} $$
+
+```{r}
+t.test(iTopicApp ~ Instructor, data=evals2017, equal.var=TRUE)
+```
+
+Did you choose an equal variance or unequal variance test? Why?
+
+**I made an assumption of equal variance so I used an equal variance test. I made this decision because the test is considering the teaching abilities of two teachers teaching the same subject.**
+
+What are the findings from this test?
+
+**There is significant difference between the two instructors in regards to their appreciation of the subject in the 2017-2018 academic year (p-value = 0.2625). We can conclude that the true mean appreciation rate of the instructors is -0.29682598 to 0.08245098 higher with Instructor 6291 compared to Instructor 6919 with 95% confidence.**
+
+## Part 6
+
+Assess the normality assumption for the performed $t$-test in the below code chunk
+
+```{r}
+ggplot(evals2017) + 
+  geom_qq(aes(sample=iTopicApp) ) + 
+  geom_qq_line(aes(sample=iTopicApp)) + 
+  facet_wrap(~Instructor)
+```
+
+Do you have any concerns about the Normality assumption? What does this imply about the test if anything.
+
+**The scores for Instructor 6919 do not hug the line as tightly as the scores for Instructor 6219 which could be a sign of inaccuracy of the inference made. The larger scores of Instructor 6219 also do not tightly follow the line which also casts doubts on the inference made.**
+
+## Part 7
+
+**NOTE: This part is arguably the hardest part of this assignment and will require you to do a little bit of problem solving.**
+
+Write code using a comination of `group_by()` and `summarize()` statements to determine which Instructor, on average, has the lowest teaching evaluations in the overall effectiveness rating (`iQuesEffect`). **Feel free to google for help**
+
+```{r}
+evals7 <- evals %>%
+  select(Instructor, iQuesEffect)
+
+evals7 %>%
+  group_by(Instructor) %>%
+  summarize(Effectiveness_Rating_Mean=mean(iQuesEffect)) %>%
+    kable()
+
+```
+
+Which Instructor has the lowest overall effective rating on average?
+
+**Instructor 6831 has the lowest average in overall effectiveness.**
